@@ -1,0 +1,82 @@
+spec_version: 1
+name: securenet-openenv
+version: "3.0.0"
+description: "Real-world SOC incident triage benchmark for autonomous agents"
+type: space
+runtime: fastapi
+app: server.app:app
+port: 7860
+tags:
+  - openenv
+  - cybersecurity
+  - incident-response
+
+environment:
+  spec: "server/securenet_environment.py:SecureNetEnvironment"
+  typed_models: "models.py"
+  observation_model: "SecureNetObservation"
+  action_model: "SecureNetAction"
+  reward_model: "SecureNetReward"
+
+action_space:
+  - query_logs(target_node)
+  - analyze_process(target_node)
+  - threat_intel(ioc or ip_address)
+  - block_ip(ip_address)
+  - quarantine_process(target_node, process_name)
+  - isolate_host(target_node)
+
+observation_space:
+  - result: string
+  - success: bool
+  - echoed_message: string
+  - available_nodes: string[]
+  - blocked_iocs: string[]
+  - isolated_hosts: string[]
+  - step_index: int
+  - max_steps: int
+
+reward:
+  range: [0.0, 1.0]
+  trajectory_signals:
+    - step_cost
+    - loop_penalty
+    - query bonus/penalty
+    - process analysis bonus/penalty
+    - ioc block bonus/penalty
+    - quarantine bonus/penalty
+    - isolate bonus/penalty
+  grader:
+    formula: "0.45*containment + 0.20*intel + 0.20*precision + 0.15*investigation"
+    clamp: [0.0, 1.0]
+
+tasks:
+  - id: soc_triage_easy
+    difficulty: easy
+    max_steps: 12
+    objective: "Contain phishing compromise on Helpdesk-PC without disrupting healthy critical hosts"
+    grader: "Deterministic weighted score in [0,1]"
+  - id: soc_triage_medium
+    difficulty: medium
+    max_steps: 16
+    objective: "Contain two compromised hosts and block attacker IOCs with minimal false positives"
+    grader: "Deterministic weighted score in [0,1]"
+  - id: soc_triage_hard
+    difficulty: hard
+    max_steps: 20
+    objective: "Stop ransomware spread under adversarial drift and preserve critical services"
+    grader: "Deterministic weighted score in [0,1]"
+
+inference:
+  baseline_script: "inference.py"
+  required_env_vars:
+    - API_BASE_URL
+    - MODEL_NAME
+    - HF_TOKEN
+  openai_key_env: OPENAI_API_KEY
+  logging_contract: "Structured stdout with [START], [STEP], [END]"
+
+resource_limits:
+  vcpu: 2
+  ram_gb: 8
+  max_inference_runtime_minutes: 20
